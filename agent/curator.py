@@ -1738,6 +1738,13 @@ def _run_llm_review(prompt: str) -> Dict[str, Any]:
              contextlib.redirect_stderr(_devnull):
             conv_result = review_agent.run_conversation(user_message=prompt)
 
+        # Meter the Curator pass into the background ledger (origin="curator").
+        try:
+            from agent.background_ledger import record_from_result, ORIGIN_CURATOR
+            record_from_result(ORIGIN_CURATOR, conv_result)
+        except Exception:
+            pass
+
         final = ""
         if isinstance(conv_result, dict):
             final = str(conv_result.get("final_response") or "").strip()
@@ -1794,6 +1801,16 @@ def maybe_run_curator(
             min_idle_s = get_min_idle_hours() * 3600.0
             if idle_for_seconds < min_idle_s:
                 return None
+        # Budget gate: skip the Curator pass when background work is disabled or
+        # over its configured daily cost cap. Fails open on ledger errors.
+        try:
+            from agent.background_ledger import is_background_allowed
+            allowed, reason = is_background_allowed()
+            if not allowed:
+                logger.info("Curator skipped: %s", reason)
+                return None
+        except Exception as e:
+            logger.debug("Curator budget check failed open: %s", e)
         return run_curator_review(on_summary=on_summary)
     except Exception as e:
         logger.debug("maybe_run_curator failed: %s", e, exc_info=True)

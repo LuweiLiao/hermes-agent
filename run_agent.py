@@ -1347,6 +1347,26 @@ class AIAgent:
         here so existing tests that patch ``run_agent.threading.Thread``
         keep working.
         """
+        # Budget gate: skip autonomous background work when disabled or over a
+        # configured cost cap. Fails open so a broken ledger can't disable
+        # self-improvement. The foreground turn is already delivered, so a skip
+        # is silent except for a one-time notice per agent.
+        try:
+            from agent.background_ledger import is_background_allowed
+            allowed, reason = is_background_allowed(
+                parent_session_id=getattr(self, "session_id", "") or ""
+            )
+        except Exception:
+            allowed, reason = True, ""
+        if not allowed:
+            if not getattr(self, "_bg_budget_notified", False):
+                self._bg_budget_notified = True
+                try:
+                    self._safe_print(f"  ⏸ Background self-improvement paused: {reason}")
+                except Exception:
+                    pass
+            return
+
         from agent.background_review import spawn_background_review_thread
         target, _prompt = spawn_background_review_thread(
             self,

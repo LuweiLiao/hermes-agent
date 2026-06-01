@@ -470,8 +470,9 @@ def _run_review_in_thread(
                     "{tool_name}. Only memory/skill tools are allowed."
                 ),
             )
+            conv_result = None
             try:
-                review_agent.run_conversation(
+                conv_result = review_agent.run_conversation(
                     user_message=(
                         prompt
                         + "\n\nYou can only call memory and skill "
@@ -482,6 +483,21 @@ def _run_review_in_thread(
                 )
             finally:
                 clear_thread_tool_whitelist()
+
+            # Meter this background pass into the dedicated ledger so its spend
+            # is visible and can be capped (see agent/background_ledger.py).
+            try:
+                from agent.background_ledger import (
+                    record_from_result,
+                    ORIGIN_REVIEW,
+                )
+                record_from_result(
+                    ORIGIN_REVIEW,
+                    conv_result,
+                    parent_session_id=getattr(agent, "session_id", "") or "",
+                )
+            except Exception:
+                pass
 
             # Snapshot review actions before teardown. close() is allowed to
             # clean per-session state, but the user-visible self-improvement

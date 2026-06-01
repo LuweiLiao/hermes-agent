@@ -1593,6 +1593,20 @@ DEFAULT_CONFIG = {
         },
     },
 
+    # Autonomous background work (memory/skill review + Curator).
+    # This work forks child agents the user never explicitly asked for, so its
+    # spend is metered separately (~/.hermes/background_ledger.db) and can be
+    # capped. Defaults below preserve prior behaviour: enabled, no cost cap.
+    #   * enabled: master switch for all autonomous background work.
+    #   * daily_cost_limit_usd / session_cost_limit_usd: null = unlimited.
+    #     When a limit is reached, background work is skipped (the user's
+    #     foreground turn is never affected). See `agent/background_ledger.py`.
+    "background": {
+        "enabled": True,
+        "daily_cost_limit_usd": None,
+        "session_cost_limit_usd": None,
+    },
+
     # Honcho AI-native memory -- reads ~/.honcho/config.json as single source of truth.
     # This section is only needed for hermes-specific overrides; everything else
     # (apiKey, workspace, peerName, sessions, enabled) comes from the global config.
